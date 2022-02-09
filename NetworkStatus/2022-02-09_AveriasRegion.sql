@@ -1,0 +1,13 @@
+WITH AVERIASNODOS AS(
+    
+SELECT DISTINCT A.Ticket_ID, A.NODO, U.PROVINCIA, U.CANTON, U.DISTRITO, CAST(LEFT(A.Fecha_Inicio,10) AS DATE) AS FechaAveria
+FROM `gcp-bia-tmps-vtr-dev-01.gcp_temp_cr_dev_01.2022-01-13_CR_AVERIAS_NODOS_2020-12_A_2021-12_T` A
+    INNER JOIN `gcp-bia-tmps-vtr-dev-01.gcp_temp_cr_dev_01.2022-02-08_CR_GEO_UBICACION_NODOS_2021_D` U
+        ON u.ID_NODO = a.NODO
+WHERE Ticket_ID IS NOT NULL
+AND (Ticket_Type = "Averia Planta Externa" OR Ticket_Type = "Averia Fibra" OR Ticket_Type = "Avería FTTH")
+)
+SELECT DISTINCT EXTRACT(MONTH FROM FechaAveria) as MES, PROVINCIA, CANTON, DISTRITO, COUNT(DISTINCT Ticket_ID) AS NumAverias
+FROM AVERIASNODOS
+GROUP BY MES, PROVINCIA, CANTON,DISTRITO
+ORDER BY MES, NumAverias DESC

@@ -20,13 +20,19 @@ CRUCECHURNERSPREVIOS AS(
     WHERE DATE(t.CST_CHRN_DT) = FECHA_EXTRACCION 
 ),
 CHURNCRONOLOGICO AS(
-    SELECT c.ContratoChurner, c.FechaChurnFinal, c.FechaChurn, Pflag, 
+    SELECT DISTINCT c.ContratoChurner, c.FechaChurnFinal, c.FechaChurn, Pflag, 
     LAG (PFLAG) OVER (PARTITION BY c.ContratoChurner ORDER BY c.FechaChurn ASC) AS PlanChurnAnterior,
     LAG (PFLAG,2) OVER (PARTITION BY c.ContratoChurner ORDER BY c.FechaChurn ASC) AS PlanChurnAnterior2,
     FROM CRUCECHURNERSPREVIOS c
 )
+,
+CHURNJOURNEYMAXFECHA AS(
+    SELECT c.*
+    FROM CHURNCRONOLOGICO c INNER JOIN CHURNERSCRM t ON c.ContratoChurner = t.ACT_ACCT_CD AND 
+    c.FechaChurn = t.MaxFecha
+)
 SELECT DISTINCT DATE_TRUNC(FechaChurnFinal, MONTH) as MesChurnFinal, Pflag, PlanChurnAnterior, PlanChurnAnterior2,
 COUNT (DISTINCT ContratoChurner) as NumCasos
-FROM CHURNCRONOLOGICO
+FROM CHURNJOURNEYMAXFECHA 
 GROUP BY MesChurnFinal, Pflag, PlanChurnAnterior, PlanChurnAnterior2
 ORDER BY MesChurnFinal

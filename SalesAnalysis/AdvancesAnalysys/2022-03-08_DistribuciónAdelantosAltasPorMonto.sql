@@ -12,7 +12,7 @@ ORDER BY a.Adelanto DESC
 ),
 /* Subconsulta con las altas de cada mes de acuerdo a los filtros definidos*/
 ALTAS AS (
-SELECT DISTINCT RIGHT(CONCAT('0000000000',Contrato) ,10) AS CONTRATOALTA, Formato_Fecha
+SELECT RIGHT(CONCAT('0000000000',Contrato) ,10) AS CONTRATOALTA, Formato_Fecha
 FROM `gcp-bia-tmps-vtr-dev-01.gcp_temp_cr_dev_01.2022-01-20_CR_ALTAS_V3_2021-01_A_2021-12_T`  
 WHERE Tipo_Venta="Nueva"
 AND (Tipo_Cliente = "PROGRAMA HOGARES CONECTADOS" OR Tipo_Cliente="RESIDENCIAL" OR Tipo_Cliente="EMPLEADO")
@@ -21,9 +21,22 @@ AND Subcanal__Venta<>"OUTBOUND PYMES" AND Subcanal__Venta<>"INBOUND PYMES" AND S
 AND Tipo_Movimiento= "Altas por venta"
 AND (Motivo="VENTA NUEVA " OR Motivo="VENTA")
 GROUP BY Contrato, Formato_Fecha
+),
+/*Subconsulta que extrae los contratos que tuvieron fecha de alta en el CRM en 2021*/
+ALTASCRM AS (
+SELECT DISTINCT RIGHT(CONCAT('0000000000',ACT_ACCT_CD) ,10) AS CONTRATOALTACRM, ACT_ACCT_INST_DT
+FROM `gcp-bia-tmps-vtr-dev-01.gcp_temp_cr_dev_01.2022-02-16_FINAL_HISTORIC_CRM_FILE_2021_D`
+WHERE EXTRACT(YEAR FROM ACT_ACCT_INST_DT)=2021
+GROUP BY ACT_ACCT_CD, ACT_ACCT_INST_DT
+),
+/*Cruce de las altas con altas del CRM*/
+CRUCEALTAS AS (
+SELECT x.CONTRATOALTA, x.Formato_Fecha
+FROM ALTASCRM y INNER JOIN ALTAS x ON y.CONTRATOALTACRM=x.CONTRATOALTA
+WHERE DATE(ACT_ACCT_INST_DT)=Formato_Fecha 
 )
 /*Cruce final que extrae la cuenta de tiquetes, contratos con adelantos por monto y contratos sin adelantos por mes*/
 SELECT DATE_TRUNC(Formato_Fecha, MONTH) AS MESALTA,COUNT(DISTINCT CONTRATOALTA) AS NumContratosAltas, COUNT(DISTINCT Orden) AS NumTiquetesAdelantos, COUNT(DISTINCT Contrato) AS NumContratosAdelantos, COUNT (DISTINCT ADELANTOS5000) AS Num5000 , COUNT(DISTINCT ADELANTOS10000) AS Num10000, (COUNT(DISTINCT ContratoAlta)- COUNT(DISTINCT Contrato)) as NumContratosNoAdelantos
-FROM CRUCEORDENESADELANTOS c RIGHT JOIN ALTAS a ON c.CONTRATO_ORDEN = a.CONTRATOALTA AND ABS(DATE_DIFF(c.FECHA_APERTURA, a.Formato_Fecha, DAY)) <= 10
+FROM CRUCEORDENESADELANTOS c RIGHT JOIN CRUCEALTAS a ON c.CONTRATO_ORDEN = a.CONTRATOALTA AND ABS(DATE_DIFF(c.FECHA_APERTURA, a.Formato_Fecha, DAY)) <= 10
 GROUP BY MESALTA
 ORDER BY MESALTA
